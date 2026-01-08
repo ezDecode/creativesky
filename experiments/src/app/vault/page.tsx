@@ -1,4 +1,3 @@
-
 import Link from "next/link";
 import Image from "next/image";
 import { resolveVaultLinks, VaultResolvedItem } from "@/lib/vault/resolve-links";
@@ -7,15 +6,39 @@ import { FilterChips } from "@/components/ui/filterchips";
 
 export const revalidate = 86400;
 
-const FILTERS = ["All", "Writings", "Portfolio", "Library", "Fonts"] as const;
+const FILTERS = ["All", "Writings", "Library", "Fonts", "Projects"] as const;
 type FilterType = (typeof FILTERS)[number];
 
 const VAULT_LINKS: { url: string; type: VaultResolvedItem["type"] }[] = [
   { url: "https://motion.dev", type: "Library" },
   { url: "https://animejs.com", type: "Library" },
   { url: "https://gsap.com", type: "Library" },
-  { url: "https://www.creativesky.me/", type: "Portfolio" },
-  { url: "https://fonts.google.com/", type:"Fonts" },
+  { url: "https://fonts.google.com/", type: "Fonts" },
+];
+
+// Static project data from Project-Alpha (no external URL resolution needed)
+const PROJECTS: Omit<VaultResolvedItem, "url" | "site">[] = [
+  {
+    title: "Component Library Platform",
+    description:
+      "A full-stack component library with authentication, moderation workflows, and a normalized PostgreSQL schema for data consistency under concurrent usage.",
+    image: null,
+    type: "Projects",
+  },
+  {
+    title: "AnyLife — AI Visual Summarizer",
+    description:
+      "A platform that transforms visual inputs into infographic summaries using Google Gemini models, solving browser constraints like storage limits and AI latency.",
+    image: null,
+    type: "Projects",
+  },
+  {
+    title: "CloudCore — Serverless AWS S3 Manager",
+    description:
+      "A serverless file management system enabling secure, high-concurrency browser-to-cloud uploads with retry logic, monitoring, and strong consistency guarantees.",
+    image: "/SiteImages/cloudcore.png",
+    type: "Projects",
+  },
 ];
 
 interface VaultPageProps {
@@ -23,34 +46,42 @@ interface VaultPageProps {
 }
 
 export default async function VaultPage({ searchParams }: VaultPageProps) {
-  const params = await searchParams ?? {};
+  const params = (await searchParams) ?? {};
 
   const activeFilter: FilterType = FILTERS.includes(params.type as FilterType)
     ? (params.type as FilterType)
     : "All";
 
   let items: VaultResolvedItem[] = [];
-  
+
   try {
     const resolved = await resolveVaultLinks(VAULT_LINKS);
     items = resolved.filter(
-      (item) => 
-        item && 
-        typeof item.url === "string" && 
-        item.url.length > 0 && 
-        typeof item.title === "string" && 
+      (item) =>
+        item &&
+        typeof item.url === "string" &&
+        item.url.length > 0 &&
+        typeof item.title === "string" &&
         item.title.length > 0
     );
   } catch (error) {
     console.error("Failed to resolve vault links:", error);
-    // Return empty array on error - page will show empty state
     items = [];
   }
 
+  // Add static projects to items
+  const projectItems: VaultResolvedItem[] = PROJECTS.map((project, index) => ({
+    ...project,
+    url: `#project-${index}`,
+    site: "Local Project",
+  }));
+
+  const allItems = [...items, ...projectItems];
+
   const filteredItems =
     activeFilter === "All"
-      ? items
-      : items.filter((item) => item && item.type === activeFilter);
+      ? allItems
+      : allItems.filter((item) => item && item.type === activeFilter);
 
   return (
     <Shell>
@@ -79,11 +110,11 @@ export default async function VaultPage({ searchParams }: VaultPageProps) {
 
         <h1 className="text-4xl font-normal tracking-normal">Vault</h1>
 
-          <FilterChips
-            filters={FILTERS}
-            activeFilter={activeFilter}
-            baseHref="/vault"
-          />
+        <FilterChips
+          filters={FILTERS}
+          activeFilter={activeFilter}
+          baseHref="/vault"
+        />
       </header>
 
       {filteredItems && filteredItems.length > 0 ? (
@@ -102,7 +133,7 @@ export default async function VaultPage({ searchParams }: VaultPageProps) {
             <p className="text-sm text-muted-foreground max-w-sm">
               {activeFilter === "All"
                 ? "No links have been added to the vault yet."
-                : `No ${activeFilter.toLowerCase()} links found. Try a different filter.`}
+                : `No ${activeFilter.toLowerCase()} found. Try a different filter.`}
             </p>
             {activeFilter !== "All" && (
               <Link
@@ -120,47 +151,87 @@ export default async function VaultPage({ searchParams }: VaultPageProps) {
 }
 
 function VaultCard({ item }: { item: VaultResolvedItem }) {
-  if (!item || !item.url || !item.title) return null;
-  
-  const hasValidImage = 
-    typeof item.image === "string" && 
-    item.image.length > 0 && 
-    (item.image.startsWith("http://") || item.image.startsWith("https://"));
-  
-  return (
-    <Link
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group block overflow-hidden rounded-xl border border-border bg-background hover:shadow-lg transition"
-    >
+  if (!item || !item.title) return null;
+
+  const isProject = item.type === "Projects";
+  const isExternalLink = item.url && !item.url.startsWith("#");
+
+  const hasValidImage =
+    typeof item.image === "string" &&
+    item.image.length > 0 &&
+    (item.image.startsWith("http://") ||
+      item.image.startsWith("https://") ||
+      item.image.startsWith("/"));
+
+  const CardContent = (
+    <>
       {hasValidImage && item.image && (
         <div className="relative aspect-video w-full overflow-hidden bg-muted/20">
-          <Image
-            src={item.image}
-            alt={item.title || ""}
-            fill
-            unoptimized
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-          />
+          {item.image.startsWith("/") ? (
+            <Image
+              src={item.image}
+              alt={item.title || ""}
+              fill
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <Image
+              src={item.image}
+              alt={item.title || ""}
+              fill
+              unoptimized
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          )}
         </div>
       )}
 
       <div className="p-4 flex flex-col gap-2">
-        <h3 className="text-base font-medium leading-snug line-clamp-2">
-          {item.title}
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-medium leading-snug line-clamp-2">
+            {item.title}
+          </h3>
+          {isProject && (
+            <span className="shrink-0 px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded-full">
+              Project
+            </span>
+          )}
+        </div>
 
-        {item.description && typeof item.description === "string" && item.description.length > 0 && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {item.description}
-          </p>
-        )}
+        {item.description &&
+          typeof item.description === "string" &&
+          item.description.length > 0 && (
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {item.description}
+            </p>
+          )}
 
         <p className="text-xs text-muted-foreground">
-          {(item.site && typeof item.site === "string" && item.site.length > 0) ? item.site : "Unknown"}
+          {item.site && typeof item.site === "string" && item.site.length > 0
+            ? item.site
+            : "Unknown"}
         </p>
       </div>
-    </Link>
+    </>
+  );
+
+  if (isExternalLink) {
+    return (
+      <Link
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group block overflow-hidden rounded-xl border border-border bg-background hover:shadow-lg transition"
+      >
+        {CardContent}
+      </Link>
+    );
+  }
+
+  // For projects without external links, render as a non-link card
+  return (
+    <div className="group block overflow-hidden rounded-xl border border-border bg-background hover:shadow-lg transition cursor-default">
+      {CardContent}
+    </div>
   );
 }

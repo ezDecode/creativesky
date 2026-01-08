@@ -1,7 +1,7 @@
 // src/lib/vault/resolve-links.ts
 // Fixed version with better error handling and fallbacks
 
-export type VaultType = "Writings" | "Portfolio" | "Library" | "Fonts";
+export type VaultType = "Writings" | "Portfolio" | "Library" | "Fonts" | "Projects";
 
 export interface VaultResolvedItem {
   url: string;
@@ -34,7 +34,7 @@ async function fetchHTML(url: string, timeoutMs = 5000): Promise<string> {
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     }
-    
+
     return await res.text();
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
@@ -108,23 +108,23 @@ function getMeta(doc: any, property: string): string | null {
 
 function resolveImageUrl(imageUrl: string | null, baseUrl: string): string | null {
   if (!imageUrl) return null;
-  
+
   try {
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
       return imageUrl;
     }
-    
+
     if (imageUrl.startsWith('//')) {
       const protocol = new URL(baseUrl).protocol;
       return `${protocol}${imageUrl}`;
     }
-    
+
     const base = new URL(baseUrl);
-    
+
     if (imageUrl.startsWith('/')) {
       return `${base.protocol}//${base.host}${imageUrl}`;
     }
-    
+
     return new URL(imageUrl, baseUrl).href;
   } catch (error) {
     console.warn(`Failed to resolve image URL: ${imageUrl}`, error);
@@ -174,7 +174,7 @@ async function resolveVaultLink(
       getMeta(doc, "description") ||
       "";
 
-    const image = 
+    const image =
       getMeta(doc, "og:image") ||
       getMeta(doc, "twitter:image");
 
@@ -194,11 +194,11 @@ async function resolveVaultLink(
     };
 
     metadataCache.set(link.url, result);
-    
+
     return result;
   } catch (error) {
     console.warn(`Failed to resolve ${link.url}:`, error);
-    
+
     const fallback: VaultResolvedItem = {
       url: link.url,
       title: getFallbackTitle(link.url),
@@ -207,9 +207,9 @@ async function resolveVaultLink(
       site: getFallbackSite(link.url),
       type: link.type,
     };
-    
+
     metadataCache.set(link.url, fallback);
-    
+
     return fallback;
   }
 }
@@ -240,7 +240,7 @@ export async function resolveVaultLinks(
     );
 
     return results
-      .filter((result): result is PromiseFulfilledResult<VaultResolvedItem> => 
+      .filter((result): result is PromiseFulfilledResult<VaultResolvedItem> =>
         result.status === 'fulfilled' && result.value !== null
       )
       .map(result => result.value);
